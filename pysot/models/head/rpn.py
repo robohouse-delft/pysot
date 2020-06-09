@@ -5,6 +5,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -92,40 +94,47 @@ class DepthwiseRPN(RPN):
         return cls, loc
 
 
+def weighted_avg(lst: List[torch.Tensor], weight: torch.Tensor) -> torch.Tensor:
+    s = torch.tensor(0.0)
+    for i in range(len(weight)):
+        s = s + lst[i] * weight[i]
+    return s
+
+
 class MultiRPN(RPN):
     def __init__(self, anchor_num, in_channels, weighted=False):
         super(MultiRPN, self).__init__()
         self.weighted = weighted
-        for i in range(len(in_channels)):
-            self.add_module('rpn'+str(i+2),
-                    DepthwiseRPN(anchor_num, in_channels[i], in_channels[i]))
+        self.rpn = nn.ModuleList([
+            DepthwiseRPN(anchor_num, in_channels[i], in_channels[i])
+            for i in range(len(in_channels))
+        ])
+
         if self.weighted:
             self.cls_weight = nn.Parameter(torch.ones(len(in_channels)))
             self.loc_weight = nn.Parameter(torch.ones(len(in_channels)))
 
-    def forward(self, z_fs, x_fs):
+    def forward(self, z_fs: torch.Tensor, x_fs: List[torch.Tensor]):
         cls = []
         loc = []
-        for idx, (z_f, x_f) in enumerate(zip(z_fs, x_fs), start=2):
-            rpn = getattr(self, 'rpn'+str(idx))
-            c, l = rpn(z_f, x_f)
+        # TODO: Switch for a zip or something if https://github.com/pytorch/pytorch/issues/16123 is resolved.
+        index = 0
+        for rpn in self.rpn:
+            c, l = rpn(z_fs[index], x_fs[index])
             cls.append(c)
             loc.append(l)
+            index += 1
 
         if self.weighted:
             cls_weight = F.softmax(self.cls_weight, 0)
             loc_weight = F.softmax(self.loc_weight, 0)
-
-        def avg(lst):
-            return sum(lst) / len(lst)
-
-        def weighted_avg(lst, weight):
-            s = 0
-            for i in range(len(weight)):
-                s += lst[i] * weight[i]
-            return s
-
-        if self.weighted:
             return weighted_avg(cls, cls_weight), weighted_avg(loc, loc_weight)
         else:
-            return avg(cls), avg(loc)
+            avg_cls = torch.tensor(0.0)
+            avg_loc = torch.tensor(0.0)
+            for c, l in zip(cls, loc):
+                avg_cls = avg_cls + c
+                avg_loc = avg_cls + l
+            avg_cls = avg_cls / len(cls)
+            avg_loc = avg_loc / len(loc)
+            return torch.mean(torch.stack(cls), dim=0), torch.mean(torch.stack(loc), dim=0)

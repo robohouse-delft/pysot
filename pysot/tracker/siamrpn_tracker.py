@@ -26,6 +26,8 @@ class SiamRPNTracker(SiameseTracker):
         self.model = model
         self.model.eval()
 
+        self.zf = None
+
     def generate_anchor(self, score_size):
         anchors = Anchors(cfg.ANCHOR.STRIDE,
                           cfg.ANCHOR.RATIOS,
@@ -88,7 +90,7 @@ class SiamRPNTracker(SiameseTracker):
         z_crop = self.get_subwindow(img, self.center_pos,
                                     cfg.TRACK.EXEMPLAR_SIZE,
                                     s_z, self.channel_average)
-        self.model.template(z_crop)
+        self.zf = self.model.template(z_crop, cfg.MASK.MASK, cfg.ADJUST.ADJUST)
 
     def track(self, img):
         """
@@ -106,7 +108,7 @@ class SiamRPNTracker(SiameseTracker):
                                     cfg.TRACK.INSTANCE_SIZE,
                                     round(s_x), self.channel_average)
 
-        outputs = self.model.track(x_crop)
+        outputs = self.model.track(self.zf, x_crop, cfg.MASK.MASK, cfg.ADJUST.ADJUST)
 
         score = self._convert_score(outputs['cls'])
         pred_bbox = self._convert_bbox(outputs['loc'], self.anchors)

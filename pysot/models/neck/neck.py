@@ -5,6 +5,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from typing import List
+
+import torch
 import torch.nn as nn
 
 
@@ -30,23 +33,20 @@ class AdjustAllLayer(nn.Module):
     def __init__(self, in_channels, out_channels, center_size=7):
         super(AdjustAllLayer, self).__init__()
         self.num = len(out_channels)
-        if self.num == 1:
-            self.downsample = AdjustLayer(in_channels[0],
-                                          out_channels[0],
-                                          center_size)
-        else:
-            for i in range(self.num):
-                self.add_module('downsample'+str(i+2),
-                                AdjustLayer(in_channels[i],
-                                            out_channels[i],
-                                            center_size))
+        self.downsample = nn.ModuleList([
+            AdjustLayer(
+                in_channels[i],
+                out_channels[i],
+                center_size
+            )
+            for i in range(self.num)
+        ])
 
-    def forward(self, features):
-        if self.num == 1:
-            return self.downsample(features)
-        else:
-            out = []
-            for i in range(self.num):
-                adj_layer = getattr(self, 'downsample'+str(i+2))
-                out.append(adj_layer(features[i]))
-            return out
+    def forward(self, features: List[torch.Tensor]):
+        out = []
+        # TODO: Switch for a zip or something if https://github.com/pytorch/pytorch/issues/16123 is resolved.
+        index = 0
+        for downsample in self.downsample:
+            out.append(downsample(features[index]))
+            index += 1
+        return out

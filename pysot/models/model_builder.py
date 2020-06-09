@@ -5,6 +5,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from typing import List
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -18,6 +21,8 @@ from pysot.models.neck import get_neck
 class ModelBuilder(nn.Module):
     def __init__(self):
         super(ModelBuilder, self).__init__()
+        self.zf = torch.jit.annotate(List[torch.Tensor], [])
+        self.xf = torch.jit.annotate(List[torch.Tensor], [])
 
         # build backbone
         self.backbone = get_backbone(cfg.BACKBONE.TYPE,
@@ -40,28 +45,32 @@ class ModelBuilder(nn.Module):
             if cfg.REFINE.REFINE:
                 self.refine_head = get_refine_head(cfg.REFINE.TYPE)
 
-    def template(self, z):
-        zf = self.backbone(z)
-        if cfg.MASK.MASK:
-            zf = zf[-1]
-        if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
-        self.zf = zf
 
-    def track(self, x):
+    def template(self, z: torch.Tensor, mask: bool, adjust: bool) -> torch.Tensor:
+        zf = self.backbone(z)
+        if mask:
+            zf = zf[-1:]
+        if adjust:
+            zf = self.neck(zf)
+        return torch.stack(zf)
+
+    def track(self, zf: torch.Tensor, x: torch.Tensor, mask: bool, adjust: bool):
         xf = self.backbone(x)
-        if cfg.MASK.MASK:
-            self.xf = xf[:-1]
-            xf = xf[-1]
-        if cfg.ADJUST.ADJUST:
+        # TODO: Fix this to work with TorchScript.
+        # if mask:
+        #     self.xf = xf[:-1]
+        #     xf = xf[-1]
+        if adjust:
             xf = self.neck(xf)
-        cls, loc = self.rpn_head(self.zf, xf)
-        if cfg.MASK.MASK:
-            mask, self.mask_corr_feature = self.mask_head(self.zf, xf)
+        cls, loc = self.rpn_head(zf, xf)
+        # TODO: Fix this to work with TorchScript.
+        # if mask:
+        #     mask, self.mask_corr_feature = self.mask_head(zf, xf)
         return {
                 'cls': cls,
                 'loc': loc,
-                'mask': mask if cfg.MASK.MASK else None
+                # TODO: Fix this to work with TorchScript.
+                # 'mask': mask if cfg.MASK.MASK else None
                }
 
     def mask_refine(self, pos):
@@ -74,6 +83,7 @@ class ModelBuilder(nn.Module):
         cls = F.log_softmax(cls, dim=4)
         return cls
 
+    @torch.jit.ignore
     def forward(self, data):
         """ only used in training
         """
