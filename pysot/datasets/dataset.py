@@ -43,10 +43,10 @@ class SubDataset(object):
 
         for video in list(meta_data.keys()):
             for track in meta_data[video]:
-                frames = meta_data[video][track]
-                frames = list(map(int,
-                              filter(lambda x: x.isdigit(), frames.keys())))
-                frames.sort()
+                frames = list(meta_data[video][track].keys())
+                # frames = list(map(int,
+                #               filter(lambda x: x.isdigit(), frames.keys())))
+                # frames.sort()
                 meta_data[video][track]['frames'] = frames
                 if len(frames) <= 0:
                     logger.warning("{}/{} has no frames".format(video, track))
@@ -62,7 +62,7 @@ class SubDataset(object):
         self.num_use = self.num if self.num_use == -1 else self.num_use
         self.videos = list(meta_data.keys())
         logger.info("{} loaded".format(self.name))
-        self.path_format = '{}.{}.{}.jpg'
+        self.path_format = '{}.{}.{}.png'
         self.pick = self.shuffle()
 
     def _filter_zero(self, meta_data):
@@ -101,7 +101,7 @@ class SubDataset(object):
         return pick[:self.num_use]
 
     def get_image_anno(self, video, track, frame):
-        frame = "{:06d}".format(frame)
+        # frame = "{:06d}".format(frame)
         image_path = os.path.join(self.root, video,
                                   self.path_format.format(frame, track, 'x'))
         image_anno = self.labels[video][track][frame]

@@ -47,9 +47,9 @@ def get_frames(video_name):
             else:
                 break
     else:
-        images = glob(os.path.join(video_name, '*.jp*'))
-        images = sorted(images,
-                        key=lambda x: int(x.split('/')[-1].split('.')[0]))
+        images = glob(os.path.join(video_name, '*.png'))
+        # images = sorted(images,
+        #                 key=lambda x: int(x.split('/')[-1].split('.')[0]))
         for img in images:
             frame = cv2.imread(img)
             yield frame

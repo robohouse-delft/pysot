@@ -1,16 +1,17 @@
-from os.path import join, isdir
+from os.path import join, isdir, basename, splitext
 from os import listdir, mkdir, makedirs
 import cv2
 import numpy as np
 import glob
 import xml.etree.ElementTree as ET
+import json
 from concurrent import futures
 import sys
 import time
 
 VID_base_path = './ILSVRC2015'
 ann_base_path = join(VID_base_path, 'Annotations/VID/train/')
-sub_sets = sorted({'a', 'b', 'c', 'd', 'e'})
+data_base_path = join(VID_base_path, 'Data/VID/train/')
 
 
 # Print iterations progress (thanks StackOverflow)
@@ -66,53 +67,47 @@ def crop_like_SiamFC(image, bbox, context_amount=0.5, exemplar_size=127, instanc
     return z, x
 
 
-def crop_video(sub_set, video, crop_path, instanc_size):
-    video_crop_base_path = join(crop_path, sub_set, video)
+def crop_video(video, crop_path, instanc_size):
+    video_crop_base_path = join(crop_path, video['base_path'])
     if not isdir(video_crop_base_path): makedirs(video_crop_base_path)
 
-    sub_set_base_path = join(ann_base_path, sub_set)
-    xmls = sorted(glob.glob(join(sub_set_base_path, video, '*.xml')))
-    for xml in xmls:
-        xmltree = ET.parse(xml)
-        # size = xmltree.findall('size')[0]
-        # frame_sz = [int(it.text) for it in size]
-        objects = xmltree.findall('object')
-        objs = []
-        filename = xmltree.findall('filename')[0].text
+    for frame in video['frame']:
+        image_path = join(data_base_path, video['base_path'], frame['img_path'])
+        filename = basename(image_path)
+        filename = splitext(filename)[0]
 
-        im = cv2.imread(xml.replace('xml', 'JPEG').replace('Annotations', 'Data'))
+        im = cv2.imread(image_path)
         avg_chans = np.mean(im, axis=(0, 1))
-        for object_iter in objects:
-            trackid = int(object_iter.find('trackid').text)
+        for object_iter in frame['objs']:
+            trackid = object_iter['trackid']
             # name = (object_iter.find('name')).text
-            bndbox = object_iter.find('bndbox')
+            bbox = object_iter['bbox']
             # occluded = int(object_iter.find('occluded').text)
 
-            bbox = [int(bndbox.find('xmin').text), int(bndbox.find('ymin').text),
-                    int(bndbox.find('xmax').text), int(bndbox.find('ymax').text)]
             z, x = crop_like_SiamFC(im, bbox, instanc_size=instanc_size, padding=avg_chans)
-            cv2.imwrite(join(video_crop_base_path, '{:06d}.{:02d}.z.jpg'.format(int(filename), trackid)), z)
-            cv2.imwrite(join(video_crop_base_path, '{:06d}.{:02d}.x.jpg'.format(int(filename), trackid)), x)
+            cv2.imwrite(join(video_crop_base_path, '{}.{:02d}.z.png'.format(filename, trackid)), z)
+            cv2.imwrite(join(video_crop_base_path, '{}.{:02d}.x.png'.format(filename, trackid)), x)
 
 
-def main(instanc_size=511, num_threads=24):
+def main(instanc_size=511, num_threads=24, data_path='vid.json'):
     crop_path = './crop{:d}'.format(instanc_size)
     if not isdir(crop_path): mkdir(crop_path)
 
-    for sub_set in sub_sets:
-        sub_set_base_path = join(ann_base_path, sub_set)
-        videos = sorted(listdir(sub_set_base_path))
-        n_videos = len(videos)
+    with open(data_path) as data_file:
+        data = json.load(data_file)
+
+    for sub_set_index, sub_set in enumerate(data):
+        n_videos = len(sub_set)
         with futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-            fs = [executor.submit(crop_video, sub_set, video, crop_path, instanc_size) for video in videos]
-            for i, f in enumerate(futures.as_completed(fs)):
+            fs = [executor.submit(crop_video, video, crop_path, instanc_size) for video in sub_set]
+            for i, _ in enumerate(futures.as_completed(fs)):
                 # Write progress to error so that it can be seen
-                printProgress(i, n_videos, prefix=sub_set, suffix='Done ', barLength=40)
+                printProgress(i, n_videos, prefix=sub_set_index, suffix='Done ', barLength=40)
 
 
 if __name__ == '__main__':
     since = time.time()
-    main(int(sys.argv[1]), int(sys.argv[2]))
+    main(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3])
     time_elapsed = time.time() - since
     print('Total complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))

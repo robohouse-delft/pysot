@@ -2,9 +2,10 @@ from os.path import join
 from os import listdir
 import json
 import numpy as np
+import sys
 
 print('load json (raw vid info), please wait 20 seconds~')
-vid = json.load(open('vid.json', 'r'))
+vid = json.load(open(sys.argv[1], 'r'))
 
 
 def check_size(frame_sz, bbox):
@@ -69,10 +70,11 @@ for subset in vid:
                             continue
                     snippet[frame['img_path'].split('.')[0]] = o['bbox']
                 snippets[video['base_path']]['{:02d}'.format(selected)] = snippet
+                print(snippets)
                 n_snippets += 1
         print('video: {:d} snippets_num: {:d}'.format(n_videos, n_snippets))
         
-train = {k:v for (k,v) in snippets.items() if 'train' in k}
+train = {k:v for (k,v) in snippets.items() if 'val' not in k}
 val = {k:v for (k,v) in snippets.items() if 'val' in k}
 
 json.dump(train, open('train.json', 'w'), indent=4, sort_keys=True)
