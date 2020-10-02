@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import math
 import numpy as np
 import cv2
 
@@ -107,14 +108,18 @@ class Augmentation:
         image = self._crop_roi(image, crop_bbox, size)
         return image, bbox
 
-    def _flip_aug(self, image, bbox):
+    def _flip_aug(self, image, bbox, angle):
         image = cv2.flip(image, 1)
         width = image.shape[1]
         bbox = Corner(width - 1 - bbox.x2, bbox.y1,
                       width - 1 - bbox.x1, bbox.y2)
-        return image, bbox
 
-    def __call__(self, image, bbox, size, gray=False):
+        angle_vector = [cos(angle), sin(angle)]
+        flipped_angle_vector = [-angle_vector[0], angle_vector[1]]
+        flipped_angle = math.atan2(angle_vector[1], angle_vector[0])
+        return image, bbox, flipped_angle
+
+    def __call__(self, image, bbox, angle, size, gray=False):
         shape = image.shape
         crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
                                          size-1, size-1))
@@ -135,5 +140,5 @@ class Augmentation:
 
         # flip augmentation
         if self.flip and self.flip > np.random.random():
-            image, bbox = self._flip_aug(image, bbox)
-        return image, bbox
+            image, bbox, angle = self._flip_aug(image, bbox, angle)
+        return image, bbox, angle

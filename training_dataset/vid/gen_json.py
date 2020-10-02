@@ -68,12 +68,14 @@ for subset in vid:
                         if obj['trackid'] == selected:
                             o = obj
                             continue
-                    snippet[frame['img_path'].split('.')[0]] = o['bbox']
+                    snippet[frame['img_path'].split('.')[0]] = {
+                        'bbox': o['bbox'],
+                        'angle': o['angle'],
+                    }
                 snippets[video['base_path']]['{:02d}'.format(selected)] = snippet
-                print(snippets)
                 n_snippets += 1
         print('video: {:d} snippets_num: {:d}'.format(n_videos, n_snippets))
-        
+
 train = {k:v for (k,v) in snippets.items() if 'val' not in k}
 val = {k:v for (k,v) in snippets.items() if 'val' in k}
 

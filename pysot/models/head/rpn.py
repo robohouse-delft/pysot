@@ -85,13 +85,15 @@ class DepthwiseXCorr(nn.Module):
 class DepthwiseRPN(RPN):
     def __init__(self, anchor_num=5, in_channels=256, out_channels=256):
         super(DepthwiseRPN, self).__init__()
-        self.cls = DepthwiseXCorr(in_channels, out_channels, 2 * anchor_num)
-        self.loc = DepthwiseXCorr(in_channels, out_channels, 4 * anchor_num)
+        self.cls   = DepthwiseXCorr(in_channels, out_channels, 2 * anchor_num)
+        self.loc   = DepthwiseXCorr(in_channels, out_channels, 4 * anchor_num)
+        self.angle = DepthwiseXCorr(in_channels, out_channels, 2 * anchor_num)
 
     def forward(self, z_f, x_f):
-        cls = self.cls(z_f, x_f)
-        loc = self.loc(z_f, x_f)
-        return cls, loc
+        cls   = self.cls(z_f, x_f)
+        loc   = self.loc(z_f, x_f)
+        angle = self.angle(z_f, x_f)
+        return cls, loc, angle
 
 
 def weighted_avg(lst: List[torch.Tensor], weight: torch.Tensor) -> torch.Tensor:
@@ -111,30 +113,27 @@ class MultiRPN(RPN):
         ])
 
         if self.weighted:
-            self.cls_weight = nn.Parameter(torch.ones(len(in_channels)))
-            self.loc_weight = nn.Parameter(torch.ones(len(in_channels)))
+            self.cls_weight   = nn.Parameter(torch.ones(len(in_channels)))
+            self.loc_weight   = nn.Parameter(torch.ones(len(in_channels)))
+            self.angle_weight = nn.Parameter(torch.ones(len(in_channels)))
 
     def forward(self, z_fs: torch.Tensor, x_fs: List[torch.Tensor]):
         cls = []
         loc = []
+        angle = []
         # TODO: Switch for a zip or something if https://github.com/pytorch/pytorch/issues/16123 is resolved.
         index = 0
         for rpn in self.rpn:
-            c, l = rpn(z_fs[index], x_fs[index])
+            c, l, a = rpn(z_fs[index], x_fs[index])
             cls.append(c)
             loc.append(l)
+            angle.append(a)
             index += 1
 
         if self.weighted:
             cls_weight = F.softmax(self.cls_weight, 0)
             loc_weight = F.softmax(self.loc_weight, 0)
-            return weighted_avg(cls, cls_weight), weighted_avg(loc, loc_weight)
+            angle_weight = F.softmax(self.angle_weight, 0)
+            return weighted_avg(cls, cls_weight), weighted_avg(loc, loc_weight), weighted_avg(angle, angle_weight)
         else:
-            avg_cls = torch.tensor(0.0)
-            avg_loc = torch.tensor(0.0)
-            for c, l in zip(cls, loc):
-                avg_cls = avg_cls + c
-                avg_loc = avg_cls + l
-            avg_cls = avg_cls / len(cls)
-            avg_loc = avg_loc / len(loc)
-            return torch.mean(torch.stack(cls), dim=0), torch.mean(torch.stack(loc), dim=0)
+            return torch.mean(torch.stack(cls), dim=0), torch.mean(torch.stack(loc), dim=0), torch.mean(torch.stack(angle), dim=0)

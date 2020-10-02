@@ -62,13 +62,14 @@ class ModelBuilder(nn.Module):
         #     xf = xf[-1]
         if adjust:
             xf = self.neck(xf)
-        cls, loc = self.rpn_head(zf, xf)
+        cls, loc, angle = self.rpn_head(zf, xf)
         # TODO: Fix this to work with TorchScript.
         # if mask:
         #     mask, self.mask_corr_feature = self.mask_head(zf, xf)
         return {
                 'cls': cls,
                 'loc': loc,
+                'angle': angle,
                 # TODO: Fix this to work with TorchScript.
                 # 'mask': mask if cfg.MASK.MASK else None
                }
@@ -92,6 +93,8 @@ class ModelBuilder(nn.Module):
         label_cls = data['label_cls'].cuda()
         label_loc = data['label_loc'].cuda()
         label_loc_weight = data['label_loc_weight'].cuda()
+        label_angle = data['label_angle'].cuda()
+        label_angle_weight = data['label_angle_weight'].cuda()
 
         # get feature
         zf = self.backbone(template)
@@ -103,18 +106,21 @@ class ModelBuilder(nn.Module):
         if cfg.ADJUST.ADJUST:
             zf = self.neck(zf)
             xf = self.neck(xf)
-        cls, loc = self.rpn_head(zf, xf)
+        cls, loc, angle = self.rpn_head(zf, xf)
 
         # get loss
         cls = self.log_softmax(cls)
         cls_loss = select_cross_entropy_loss(cls, label_cls)
         loc_loss = weight_l1_loss(loc, label_loc, label_loc_weight)
+        angle_loss = weight_l1_loss(angle, label_angle, label_angle_weight, num_values=2)
 
         outputs = {}
         outputs['total_loss'] = cfg.TRAIN.CLS_WEIGHT * cls_loss + \
-            cfg.TRAIN.LOC_WEIGHT * loc_loss
+            cfg.TRAIN.LOC_WEIGHT * loc_loss + \
+            cfg.TRAIN.ANGLE_WEIGHT * angle_loss
         outputs['cls_loss'] = cls_loss
         outputs['loc_loss'] = loc_loss
+        outputs['angle_loss'] = angle_loss
 
         if cfg.MASK.MASK:
             # TODO

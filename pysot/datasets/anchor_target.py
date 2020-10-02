@@ -21,13 +21,15 @@ class AnchorTarget:
         self.anchors.generate_all_anchors(im_c=cfg.TRAIN.SEARCH_SIZE//2,
                                           size=cfg.TRAIN.OUTPUT_SIZE)
 
-    def __call__(self, target, size, neg=False):
+    def __call__(self, target, angle_target, size, neg=False):
         anchor_num = len(cfg.ANCHOR.RATIOS) * len(cfg.ANCHOR.SCALES)
 
         # -1 ignore 0 negative 1 positive
         cls = -1 * np.ones((anchor_num, size, size), dtype=np.int64)
         delta = np.zeros((4, anchor_num, size, size), dtype=np.float32)
         delta_weight = np.zeros((anchor_num, size, size), dtype=np.float32)
+        angle = np.zeros((2, anchor_num, size, size), dtype=np.float32)
+        angle_weight = np.zeros((anchor_num, size, size), dtype=np.float32)
 
         def select(position, keep_num=16):
             num = position[0].shape[0]
@@ -62,7 +64,10 @@ class AnchorTarget:
             cls[neg] = 0
 
             overlap = np.zeros((anchor_num, size, size), dtype=np.float32)
-            return cls, delta, delta_weight, overlap
+            return cls, delta, delta_weight, angle, angle_weight, overlap
+
+        angle[0] = np.cos(angle_target)
+        angle[1] = np.sin(angle_target)
 
         anchor_box = self.anchors.all_anchors[0]
         anchor_center = self.anchors.all_anchors[1]
@@ -86,6 +91,7 @@ class AnchorTarget:
 
         cls[pos] = 1
         delta_weight[pos] = 1. / (pos_num + 1e-6)
+        angle_weight[pos] = 1. / (pos_num + 1e-6)
 
         cls[neg] = 0
-        return cls, delta, delta_weight, overlap
+        return cls, delta, delta_weight, angle, angle_weight, overlap

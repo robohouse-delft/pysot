@@ -104,8 +104,9 @@ class SubDataset(object):
         # frame = "{:06d}".format(frame)
         image_path = os.path.join(self.root, video,
                                   self.path_format.format(frame, track, 'x'))
-        image_anno = self.labels[video][track][frame]
-        return image_path, image_anno
+        image_anno = self.labels[video][track][frame]['bbox']
+        image_angle = self.labels[video][track][frame]['angle']
+        return image_path, image_anno, image_angle
 
     def get_positive_pair(self, index):
         video_name = self.videos[index]
@@ -249,24 +250,29 @@ class TrkDataset(Dataset):
         template_image = cv2.imread(template[0])
         search_image = cv2.imread(search[0])
 
-        # get bounding box
+        # get bounding box and angle
         template_box = self._get_bbox(template_image, template[1])
-        search_box = self._get_bbox(search_image, search[1])
+        search_box   = self._get_bbox(search_image, search[1])
+
+        template_angle = template[2]
+        search_angle   = search[2]
 
         # augmentation
-        template, _ = self.template_aug(template_image,
-                                        template_box,
-                                        cfg.TRAIN.EXEMPLAR_SIZE,
-                                        gray=gray)
+        template, _, _ = self.template_aug(template_image,
+                                           template_box,
+                                           template_angle,
+                                           cfg.TRAIN.EXEMPLAR_SIZE,
+                                           gray=gray)
 
-        search, bbox = self.search_aug(search_image,
-                                       search_box,
-                                       cfg.TRAIN.SEARCH_SIZE,
-                                       gray=gray)
+        search, bbox, angle = self.search_aug(search_image,
+                                              search_box,
+                                              search_angle,
+                                              cfg.TRAIN.SEARCH_SIZE,
+                                              gray=gray)
 
         # get labels
-        cls, delta, delta_weight, overlap = self.anchor_target(
-                bbox, cfg.TRAIN.OUTPUT_SIZE, neg)
+        cls, delta, delta_weight, angle, angle_weight, overlap = self.anchor_target(
+                bbox, angle, cfg.TRAIN.OUTPUT_SIZE, neg)
         template = template.transpose((2, 0, 1)).astype(np.float32)
         search = search.transpose((2, 0, 1)).astype(np.float32)
         return {
@@ -275,5 +281,7 @@ class TrkDataset(Dataset):
                 'label_cls': cls,
                 'label_loc': delta,
                 'label_loc_weight': delta_weight,
+                'label_angle': angle,
+                'label_angle_weight': angle_weight,
                 'bbox': np.array(bbox)
                 }
