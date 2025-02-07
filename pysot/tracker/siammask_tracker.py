@@ -27,7 +27,7 @@ class SiamMaskTracker(SiamRPNTracker):
         c = -a * bbox[0]
         d = -b * bbox[1]
         mapping = np.array([[a, 0, c],
-                            [0, b, d]]).astype(np.float)
+                            [0, b, d]]).astype(np.float32)
         crop = cv2.warpAffine(image, mapping, (out_sz[0], out_sz[1]),
                               flags=cv2.INTER_LINEAR,
                               borderMode=cv2.BORDER_CONSTANT,

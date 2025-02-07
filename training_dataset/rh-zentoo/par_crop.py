@@ -41,9 +41,12 @@ def crop_hwc(image, bbox, out_sz, padding=(0, 0, 0)):
     b = (out_sz-1) / (bbox[3]-bbox[1])
     c = -a * bbox[0]
     d = -b * bbox[1]
+    print(bbox)
     mapping = np.array([[a, 0, c],
                         [0, b, d]]).astype(np.float32)
+    print("hello")
     crop = cv2.warpAffine(image, mapping, (out_sz, out_sz), borderMode=cv2.BORDER_CONSTANT, borderValue=padding)
+    print("hello")
     return crop
 
 
@@ -61,7 +64,7 @@ def crop_like_SiamFC(image, bbox, context_amount=0.5, exemplar_size=127, instanc
     d_search = (instanc_size - exemplar_size) / 2
     pad = d_search / scale_z
     s_x = s_z + 2 * pad
-
+    print("hello")
     z = crop_hwc(image, pos_s_2_bbox(target_pos, s_z), exemplar_size, padding)
     x = crop_hwc(image, pos_s_2_bbox(target_pos, s_x), instanc_size, padding)
     return z, x
@@ -70,12 +73,11 @@ def crop_like_SiamFC(image, bbox, context_amount=0.5, exemplar_size=127, instanc
 def crop_video(video, crop_path, instanc_size):
     video_crop_base_path = join(crop_path, video['base_path'])
     if not isdir(video_crop_base_path): makedirs(video_crop_base_path)
-
     for frame in video['frame']:
         image_path = join(data_base_path, video['base_path'], frame['img_path'])
         filename = basename(image_path)
         filename = splitext(filename)[0]
-
+        print(image_path)
         im = cv2.imread(image_path)
         avg_chans = np.mean(im, axis=(0, 1))
         for object_iter in frame['objs']:
@@ -83,10 +85,12 @@ def crop_video(video, crop_path, instanc_size):
             # name = (object_iter.find('name')).text
             bbox = object_iter['bbox']
             # occluded = int(object_iter.find('occluded').text)
-
+            # print("start")
             z, x = crop_like_SiamFC(im, bbox, instanc_size=instanc_size, padding=avg_chans)
+            # print("done")
             cv2.imwrite(join(video_crop_base_path, '{}.{:02d}.z.png'.format(filename, trackid)), z)
             cv2.imwrite(join(video_crop_base_path, '{}.{:02d}.x.png'.format(filename, trackid)), x)
+
 
 
 def main(instanc_size=511, num_threads=24, data_path='vid.json'):
@@ -94,7 +98,7 @@ def main(instanc_size=511, num_threads=24, data_path='vid.json'):
     if not isdir(crop_path): mkdir(crop_path)
 
     with open(data_path) as data_file:
-        data = json.load(data_file)
+        data = [json.load(data_file)]
 
     for sub_set_index, sub_set in enumerate(data):
         n_videos = len(sub_set)

@@ -1,5 +1,18 @@
 META_ARC: "siamrpn_r50_l234_dwxcorr"
 
+# TRAIN:
+    # BATCH_SIZE: 32
+    # PRETRAINED: "model.pth"
+
+DATASET:
+    NAMES:
+        - VID
+    VID:
+        ROOT: "training_dataset/rh-zentoo/crop511"
+        ANNO: "training_dataset/rh-zentoo/train.json"
+        FRAME_RANGE: 147
+        NUM_USE: 147
+
 BACKBONE:
     TYPE: "resnet50"
     KWARGS:

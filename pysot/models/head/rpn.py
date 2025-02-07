@@ -105,10 +105,11 @@ class MultiRPN(RPN):
     def __init__(self, anchor_num, in_channels, weighted=False):
         super(MultiRPN, self).__init__()
         self.weighted = weighted
-        self.rpn = nn.ModuleList([
-            DepthwiseRPN(anchor_num, in_channels[i], in_channels[i])
-            for i in range(len(in_channels))
-        ])
+        # self.rpn = nn.ModuleList([
+            # DepthwiseRPN(anchor_num, in_channels[i], in_channels[i])
+            # for i in range(len(in_channels))
+        # ])
+        self.rpn = nn.ModuleDict([('rpn' + str(i + 2), DepthwiseRPN(anchor_num, in_channels[i], in_channels[i])) for i in range(len(in_channels))])
 
         if self.weighted:
             self.cls_weight = nn.Parameter(torch.ones(len(in_channels)))
@@ -119,7 +120,7 @@ class MultiRPN(RPN):
         loc = []
         # TODO: Switch for a zip or something if https://github.com/pytorch/pytorch/issues/16123 is resolved.
         index = 0
-        for rpn in self.rpn:
+        for rpn in self.rpn.values():
             c, l = rpn(z_fs[index], x_fs[index])
             cls.append(c)
             loc.append(l)

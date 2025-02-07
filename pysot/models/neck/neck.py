@@ -33,20 +33,21 @@ class AdjustAllLayer(nn.Module):
     def __init__(self, in_channels, out_channels, center_size=7):
         super(AdjustAllLayer, self).__init__()
         self.num = len(out_channels)
-        self.downsample = nn.ModuleList([
-            AdjustLayer(
-                in_channels[i],
-                out_channels[i],
-                center_size
-            )
-            for i in range(self.num)
-        ])
+        # self.downsample = nn.ModuleList([
+        #     AdjustLayer(
+        #         in_channels[i],
+        #         out_channels[i],
+        #         center_size
+        #     )
+        #     for i in range(self.num)
+        # ])
+        self.downsample = nn.ModuleDict([('downsample' + str(i + 2), AdjustLayer( in_channels[i], out_channels[i], center_size)) for i in range(self.num)])
 
     def forward(self, features: List[torch.Tensor]):
         out = []
         # TODO: Switch for a zip or something if https://github.com/pytorch/pytorch/issues/16123 is resolved.
         index = 0
-        for downsample in self.downsample:
+        for downsample in self.downsample.values():
             out.append(downsample(features[index]))
             index += 1
         return out
