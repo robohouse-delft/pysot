@@ -1,0 +1,26 @@
+[project]
+name = "pysot"
+version = "0.1.0"
+description = "SenseTime Research platform for single object tracking, implementing algorithms like SiamRPN and SiamMask."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "colorama>=0.4.6",
+    "cython>=3.0.12",
+    "matplotlib>=3.10.0",
+    "opencv-python>=4.11.0.86",
+    "pyyaml>=6.0.2",
+    "tensorboardx>=2.6.2.2",
+    "tqdm>=4.67.1",
+    "yacs>=0.1.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pysot"]
